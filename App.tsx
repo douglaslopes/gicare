@@ -50,7 +50,7 @@ const App: React.FC = () => {
       const permission = await Notification.requestPermission();
       setNotificationPermission(permission);
       if (permission === 'granted') {
-        new Notification("GiCare", { body: "Notificações ativadas! Avisaremos na hora dos remédios." });
+        new Notification("GiCare", { body: "Notificações ativadas! Avisaremos na hora dos remédios e consultas." });
       }
     } catch (e) {
       console.error("Erro ao solicitar permissão", e);
@@ -60,14 +60,14 @@ const App: React.FC = () => {
   useEffect(() => {
     if (notificationPermission !== 'granted') return;
 
-    const checkMedications = () => {
+    const checkNotifications = () => {
       const now = new Date();
       const currentTime = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       const currentDateStr = now.toISOString().split('T')[0];
 
+      // 1. Check Medications
       MEDICATION_SCHEDULE.forEach(med => {
         if (med.times.includes(currentTime)) {
-          // Check if already taken today at this time
           const alreadyTaken = logs.some(
             log => log.medScheduleId === med.id && log.date === currentDateStr && log.time === currentTime && log.taken
           );
@@ -75,20 +75,45 @@ const App: React.FC = () => {
           if (!alreadyTaken) {
             new Notification(`Hora do Remédio: ${med.name}`, {
               body: `Está na hora de tomar o remédio (${currentTime}). Categoria: ${med.category}`,
-              icon: '/favicon.ico' // Assuming standard favicon exists or browsers default
+              icon: '/favicon.ico'
             });
+          }
+        }
+      });
+
+      // 2. Check Appointments
+      appointments.forEach(apt => {
+        if (apt.date === currentDateStr) {
+          // Check for Exact Time
+          if (apt.time === currentTime) {
+             new Notification(`Consulta Agora: ${apt.title}`, {
+                body: `Sua consulta é agora às ${apt.time}. Local: ${apt.location || 'Não informado'}`,
+                icon: '/favicon.ico'
+             });
+          }
+
+          // Check for 1 Hour Before
+          const aptDate = new Date(`${apt.date}T${apt.time}`);
+          const oneHourBefore = new Date(aptDate.getTime() - 60 * 60 * 1000);
+          const oneHourBeforeTime = oneHourBefore.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          
+          if (currentTime === oneHourBeforeTime) {
+             new Notification(`Lembrete de Consulta: ${apt.title}`, {
+                body: `Sua consulta será em 1 hora (${apt.time}). Prepare-se!`,
+                icon: '/favicon.ico'
+             });
           }
         }
       });
     };
 
     // Check every minute
-    const intervalId = setInterval(checkMedications, 60000);
+    const intervalId = setInterval(checkNotifications, 60000);
     // Initial check (in case user opens app exactly on minute)
-    checkMedications();
+    checkNotifications();
 
     return () => clearInterval(intervalId);
-  }, [notificationPermission, logs]);
+  }, [notificationPermission, logs, appointments]);
   // --------------------------
 
   const handleToggleMed = (scheduleId: string, date: string, time: string) => {
