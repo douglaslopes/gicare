@@ -10,9 +10,18 @@ interface AppointmentPanelProps {
 }
 
 const AppointmentPanel: React.FC<AppointmentPanelProps> = ({ appointments, onAddAppointment, onDeleteAppointment }) => {
+  const [mode, setMode] = useState<'ai' | 'manual'>('ai');
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Manual Form State
+  const [manualForm, setManualForm] = useState({
+    title: '',
+    date: new Date().toISOString().split('T')[0],
+    time: '08:00',
+    location: ''
+  });
 
   // Filter for current week only
   const currentWeekAppointments = useMemo(() => {
@@ -56,13 +65,40 @@ const AppointmentPanel: React.FC<AppointmentPanelProps> = ({ appointments, onAdd
             onAddAppointment(newAppointment);
             setInputText('');
         } else {
-            setErrorMsg('Não entendi muito bem. Tente: "Neuro na terça às 14h".');
+            setErrorMsg('Não entendi muito bem. Tente usar o modo manual.');
         }
     } catch (err) {
-        setErrorMsg('Erro ao processar. Verifique sua conexão.');
+        console.error(err);
+        setErrorMsg('Erro ao processar. Tente o modo manual.');
     } finally {
         setIsProcessing(false);
     }
+  };
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualForm.title || !manualForm.date || !manualForm.time) {
+        setErrorMsg('Preencha os campos obrigatórios.');
+        return;
+    }
+
+    const newAppointment: Appointment = {
+        id: crypto.randomUUID(),
+        title: manualForm.title,
+        date: manualForm.date,
+        time: manualForm.time,
+        location: manualForm.location || 'Não informado'
+    };
+    onAddAppointment(newAppointment);
+    
+    // Reset form
+    setManualForm({
+        title: '',
+        date: new Date().toISOString().split('T')[0],
+        time: '08:00',
+        location: ''
+    });
+    setMode('ai'); // Switch back or stay? Let's switch back to list view essentially
   };
 
   const getDayLabel = (dateStr: string) => {
@@ -74,34 +110,107 @@ const AppointmentPanel: React.FC<AppointmentPanelProps> = ({ appointments, onAdd
     <div className="pb-20 space-y-6">
        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-2">Consultas da Semana</h2>
-            <p className="text-gray-500">Veja apenas o que é importante para agora. Adicione novas consultas escrevendo naturalmente.</p>
+            <p className="text-gray-500">Veja apenas o que é importante para agora.</p>
         </div>
 
-        {/* AI Input */}
-        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-5 border border-indigo-100 shadow-sm">
-            <label className="block text-sm font-semibold text-indigo-900 mb-2 flex items-center gap-2">
+        {/* Toggle Mode */}
+        <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+            <button 
+                onClick={() => setMode('ai')}
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-2
+                ${mode === 'ai' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
                 <Icons.Magic />
-                Adicionar Nova Consulta (IA)
-            </label>
-            <form onSubmit={handleAISubmit} className="relative">
-                <input 
-                    type="text"
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    placeholder="Ex: Cardiologista na sexta-feira às 15h no Hospital Central"
-                    className="w-full pl-4 pr-24 py-3 rounded-lg border border-indigo-200 focus:ring-2 focus:ring-indigo-400 focus:outline-none shadow-sm"
-                    disabled={isProcessing}
-                />
+                IA (Automático)
+            </button>
+            <button 
+                onClick={() => setMode('manual')}
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-2
+                ${mode === 'manual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+                <Icons.Plus />
+                Manual
+            </button>
+        </div>
+
+        {/* Input Forms */}
+        {mode === 'ai' ? (
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-5 border border-indigo-100 shadow-sm">
+                <label className="block text-sm font-semibold text-indigo-900 mb-2">
+                    Escreva como se estivesse falando:
+                </label>
+                <form onSubmit={handleAISubmit} className="relative">
+                    <input 
+                        type="text"
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        placeholder="Ex: Cardiologista na sexta-feira às 15h no Hospital Central"
+                        className="w-full pl-4 pr-24 py-3 rounded-lg border border-indigo-200 focus:ring-2 focus:ring-indigo-400 focus:outline-none shadow-sm"
+                        disabled={isProcessing}
+                    />
+                    <button 
+                        type="submit"
+                        disabled={isProcessing || !inputText}
+                        className="absolute right-2 top-2 bottom-2 bg-indigo-600 text-white px-4 rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isProcessing ? '...' : 'Criar'}
+                    </button>
+                </form>
+                {errorMsg && <p className="text-red-500 text-xs mt-2">{errorMsg}</p>}
+            </div>
+        ) : (
+            <form onSubmit={handleManualSubmit} className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm space-y-4">
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Título / Médico</label>
+                    <input 
+                        type="text" 
+                        required
+                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        placeholder="Ex: Dr. Silva (Neuro)"
+                        value={manualForm.title}
+                        onChange={e => setManualForm({...manualForm, title: e.target.value})}
+                    />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Data</label>
+                        <input 
+                            type="date" 
+                            required
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                            value={manualForm.date}
+                            onChange={e => setManualForm({...manualForm, date: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hora</label>
+                        <input 
+                            type="time" 
+                            required
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                            value={manualForm.time}
+                            onChange={e => setManualForm({...manualForm, time: e.target.value})}
+                        />
+                    </div>
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Local (Opcional)</label>
+                    <input 
+                        type="text" 
+                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="Ex: Clínica Centro, Sala 10"
+                        value={manualForm.location}
+                        onChange={e => setManualForm({...manualForm, location: e.target.value})}
+                    />
+                </div>
                 <button 
                     type="submit"
-                    disabled={isProcessing || !inputText}
-                    className="absolute right-2 top-2 bottom-2 bg-indigo-600 text-white px-4 rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition-colors"
                 >
-                    {isProcessing ? '...' : 'Criar'}
+                    Salvar Consulta
                 </button>
             </form>
-            {errorMsg && <p className="text-red-500 text-xs mt-2">{errorMsg}</p>}
-        </div>
+        )}
 
         {/* List */}
         <div className="space-y-3">
@@ -122,7 +231,7 @@ const AppointmentPanel: React.FC<AppointmentPanelProps> = ({ appointments, onAdd
                         </div>
                         <button 
                             onClick={() => onDeleteAppointment(apt.id)}
-                            className="text-gray-300 hover:text-red-500 p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="text-gray-300 hover:text-red-500 p-2 group-hover:opacity-100 transition-opacity"
                             title="Remover consulta"
                         >
                             ✕
