@@ -31,8 +31,11 @@ const parseAppointmentWithGemini = async (input: string, todayDate: string): Pro
       }
     });
 
-    if (response.text) {
-        return JSON.parse(response.text) as ParsedAppointment;
+    const text = response.text;
+    if (text) {
+        // Cleaning potential Markdown formatting (```json ... ```) that might break JSON.parse
+        const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(cleanedText) as ParsedAppointment;
     }
     return null;
   } catch (error) {
