@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { MedicationScheduleItem, MedLog } from '../types';
 import { Icons } from '../constants';
 
@@ -22,7 +22,8 @@ const formatDisplayDate = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-d
 const getDayName = (d: Date) => d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
 
 const MedicationGrid: React.FC<MedicationGridProps> = ({ schedule, logs, onToggleMed, currentDate }) => {
-  
+  const [showHistory, setShowHistory] = useState(false);
+
   const weekDays = useMemo(() => {
     const start = getStartOfWeek(currentDate);
     const days = [];
@@ -36,13 +37,88 @@ const MedicationGrid: React.FC<MedicationGridProps> = ({ schedule, logs, onToggl
 
   const isToday = (d: Date) => formatDateISO(d) === formatDateISO(new Date());
 
+  const sortedHistoryLogs = useMemo(() => {
+    return [...logs].sort((a, b) => {
+       const dateA = new Date(`${a.date}T${a.time}`);
+       const dateB = new Date(`${b.date}T${b.time}`);
+       return dateB.getTime() - dateA.getTime();
+    });
+  }, [logs]);
+
+  if (showHistory) {
+     return (
+        <div className="flex flex-col space-y-6 pb-20">
+           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-center">
+              <div>
+                  <h2 className="text-xl font-bold text-gray-800">Histórico</h2>
+                  <p className="text-sm text-gray-500">Registro de tudo que já foi tomado.</p>
+              </div>
+              <button 
+                onClick={() => setShowHistory(false)}
+                className="text-sm text-blue-600 font-medium flex items-center gap-1 bg-blue-50 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                 <Icons.Back />
+                 Voltar
+              </button>
+           </div>
+
+           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+             {sortedHistoryLogs.length === 0 ? (
+                <div className="p-10 text-center text-gray-400">Nenhum registro encontrado ainda.</div>
+             ) : (
+                <div className="divide-y divide-gray-100">
+                    {sortedHistoryLogs.map((log) => {
+                        const med = schedule.find(s => s.id === log.medScheduleId);
+                        if (!med) return null;
+
+                        const logDate = new Date(`${log.date}T${log.time}`);
+                        const takenDate = log.takenAt ? new Date(log.takenAt) : null;
+
+                        return (
+                            <div key={log.id} className="p-4 flex gap-4 hover:bg-gray-50">
+                                <div className="flex flex-col items-center">
+                                    <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                                        <Icons.Check />
+                                    </div>
+                                    <div className="h-full w-0.5 bg-gray-100 mt-2"></div>
+                                </div>
+                                <div className="pb-4">
+                                    <h4 className="font-bold text-gray-900">{med.name}</h4>
+                                    <p className="text-sm text-gray-500 mb-1">
+                                        Agendado: {logDate.toLocaleDateString('pt-BR')} às {log.time}
+                                    </p>
+                                    {takenDate && (
+                                        <p className="text-xs text-green-600 bg-green-50 inline-block px-2 py-0.5 rounded">
+                                            Confirmado em: {takenDate.toLocaleDateString('pt-BR')} às {takenDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute:'2-digit'})}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+             )}
+           </div>
+        </div>
+     );
+  }
+
   return (
     <div className="flex flex-col space-y-6 pb-20">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-        <h2 className="text-xl font-bold text-gray-800 mb-2">Semana Atual</h2>
-        <p className="text-sm text-gray-500">
-          De {formatDisplayDate(weekDays[0])} a {formatDisplayDate(weekDays[6])}
-        </p>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-center">
+        <div>
+           <h2 className="text-xl font-bold text-gray-800">Semana Atual</h2>
+           <p className="text-sm text-gray-500">
+             De {formatDisplayDate(weekDays[0])} a {formatDisplayDate(weekDays[6])}
+           </p>
+        </div>
+        <button 
+           onClick={() => setShowHistory(true)}
+           className="text-sm text-blue-600 font-medium flex items-center gap-1 bg-blue-50 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors"
+        >
+           <Icons.History />
+           Ver Histórico
+        </button>
       </div>
 
       {/* Mobile-First Card View (Day by Day) for small screens */}
