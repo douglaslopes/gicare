@@ -1,0 +1,5 @@
+{
+  "name": "GiCare - Agenda & Saúde",
+  "description": "Aplicativo de gestão de saúde para a Giovanna. Controle de medicamentos, estoque e agendamento de consultas com suporte a linguagem natural.",
+  "requestFramePermissions": []
+}
